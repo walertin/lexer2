@@ -1,0 +1,677 @@
+#include<iostream>
+#include<vector>
+#include<fstream>
+#include<string>
+#include<iomanip>
+using namespace std;
+
+struct Lexem_Token//создаем токен
+{
+    size_t number_of_string;
+    string lexem;
+    string name;
+    Lexem_Token(size_t m_number_of_string, string m_lexem, string m_name)//конструктор для токена
+    {
+        number_of_string = m_number_of_string;
+        lexem = m_lexem;
+        name = m_name;
+
+    }
+
+};
+bool Check_Var_correct(string str)//проверяем правильность переменной
+{
+    string mistake;
+    for (size_t i = 0; i < str.size(); i++)
+    {
+        if (!(isdigit(str[i]) or (isalpha(str[i])))) {//если это не буква или цифра то ошибка
+            mistake += str[i];
+        }
+        if (mistake.size()>=1) {
+            cout << str << " in this var needs to delete  " << mistake<<endl;
+            return 0;
+
+        }
+
+
+    }
+    return 1;
+
+}
+bool Check_Matrix_correct(string str)//проверяем кооректность ввода матриц
+{
+    int i = 0;
+    int numElements = 0;
+    int len = 0;
+    bool flag=0;
+    if (str[i] == '[')
+    {
+        i++;
+        while (isdigit(str[i]) || str[i] == ',' || str[i] == ';' || str[i] == '/')
+        {
+            if (str[i] == ',' || str[i] == ';'){
+                numElements++;
+            }
+            if (str[i] == '/' or str[i] == ']'){
+
+                if (!flag){
+                    len=numElements;
+                    flag=1;}
+                if(flag and numElements!=len){return 0;}
+                numElements = 0;
+            }
+            i++;
+        }
+
+        if (str[i] == ']')
+        {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+bool Check_constant(string str) {//проверка ввода константы
+    for (size_t i = 0; i < str.size(); i++) {
+        if (!isdigit(str[i]))
+            return 0;
+    }
+    return 1;
+}
+
+
+
+
+void Lexer()
+{
+    ifstream in("Text.txt");
+    string buff;
+    vector<Lexem_Token> words;
+    string str;//создаем поток чтения буффер вектор с токенами лексем и строку для использования
+
+    vector<pair<size_t,string>> newStr;
+    vector<pair<size_t, string>> copy;//также создаем два вектора которая содержит строку которые мы берем с файла и копия для разной работы
+    //getline(in, buff);
+    size_t number_of_string=1;// нумеруем первую строку
+
+    while (getline(in, buff))//кладем все токены в векторы в вектор с указанием их строки
+    {
+        for (size_t i = 0; i < buff.size(); i++)
+        {
+            if (buff[i] != ' ')
+            {
+                str = str + buff[i];
+
+                if (buff[i + 1] == (' '))
+                {
+                    newStr.push_back({ number_of_string,str});
+                    str.clear();
+
+                }
+
+            }
+        }
+        number_of_string++;
+    }
+    /* for (auto i : newStr)
+        cout << i.first <<" " <<i.second << endl;*/
+    for (size_t i = 0; i < newStr.size(); i++)//перебираем все лексемы
+    {
+        copy.push_back(newStr[i]);//копируем на каждой итерацие элемент в вектор копи
+        if (newStr[i].second == string("<--"))//если это начала комментария то игнорируем все остальное
+        {
+            while (newStr[i].second != string("-->"))
+            {
+                ++i;
+                if (i == newStr.size()) {//если мы дошли до конца строки и коменто не закрыт
+                    cout << "Comment is not closed" <<" at string "<<newStr[i-1].first << endl;
+                    copy.pop_back();
+                    copy.push_back({ newStr[i - 1].first,string("Errorcomm")});//кидаем в копию что это не токен с комментом а токен
+                    //с ошибочным комментом
+                    break;
+                }
+            }
+
+        }
+
+    }
+    newStr = copy;//копируем в наш вектор с токенами вектор копи
+    /* cout << "After" << endl;
+     for (auto i : newStr)
+        cout << i.first << " " << i.second << endl;*/
+
+
+    for (auto i : newStr)//перебираем элементы в векторе
+    {
+        if (i.second == string("Errorcomm"))
+        {
+            words.push_back(Lexem_Token(i.first, string("Error comment"), string("Error")));
+            continue;
+
+        }
+        if (isdigit(i.second[0])and(words[words.size()-1].lexem!=string("jump")))
+        {
+            if (Check_constant(i.second))
+            {
+                words.push_back(Lexem_Token(i.first, i.second, string("Constant")));
+                continue;
+            }
+            else
+            {
+
+                string str;
+                size_t l = 0;
+                for (size_t j = 0; j < i.second.size(); j++)
+                {
+                    if (isalpha(i.second[j]))
+                        l++;
+                }
+                if (l == 0)
+                {
+                    for (size_t m = 0; m < i.second.size(); m++)
+                    {
+                        if (!isdigit(i.second[m])) {
+                            str += i.second[m];
+                        }
+
+                    }
+                    cout << "There is error in Constant with exists forbidden symbols" << "    " << i.second << "  " << str << " - it should be destroyed" << endl;
+                    cout << "At " << i.first << " str" << endl;
+                    words.push_back(Lexem_Token(i.first, string("Error in Constant"), string("Error")));
+                    continue;
+
+
+                }
+                for (size_t c = 0; c < i.second.size(); ++c) {
+                    if (isalpha(i.second[c]))
+                        continue;
+                    str += i.second[c];
+                }
+                cout << "There is error in name of Variable,it cannot begins on digit" << "    " << i.second << "  " << str << " - it should be destroyed"<<endl;
+                cout << "At " << i.first << " str"<<endl;
+                words.push_back(Lexem_Token(i.first, string("Error in Variable"), string("Error")));
+                continue;
+            }
+        }
+
+        if (i.second == string(";"))
+        {
+            words.push_back(Lexem_Token(i.first, string(";"), string("Semicolon")));
+            continue;
+
+        }
+
+        if (i.second == string("if"))
+        {
+            words.push_back(Lexem_Token(i.first, string("if"), string("if")));
+            continue;
+
+        }
+        if (i.second == string("else"))
+        {
+            words.push_back(Lexem_Token(i.first, string("else"), string("else")));
+            continue;
+
+        }
+        if (i.second == string("declare"))
+        {
+            words.push_back(Lexem_Token(i.first, string("declare"), string("declare")));
+            continue;
+
+        }
+        if (i.second == string("case"))
+        {
+            words.push_back(Lexem_Token(i.first, string("case"), string("case")));
+            continue;
+
+        }
+        if (i.second == string("while"))
+        {
+            words.push_back(Lexem_Token(i.first, string("while"), string("while")));
+            continue;
+
+        }
+        if (i.second == string("+"))
+        {
+            words.push_back(Lexem_Token(i.first, string("+"), string("Ar_Opr")));
+            continue;
+
+        }
+        if ( ((i.second[0] =='+')or (i.second[0] == '-')or (i.second[0] == '*')or (i.second[0] == '/')or (i.second[0] == '%')) and(i.second.size()>1))
+        {
+            if (i.second == string("->"))
+            {
+                words.push_back(Lexem_Token(i.first, string("->"), string("Vivod")));
+                continue;
+            }else{
+            cout << i.second << "  This arithm operation not exists!"<<"Error at string  "<<i.first<<endl;
+            string sr;
+            for (size_t k = 1; k < i.second.size(); k++) {
+                sr += i.second[k];
+            }
+            cout << "It should delete " << sr<<endl;
+            words.push_back(Lexem_Token(i.first, string("Ar_Error"), string("Error")));
+            continue;}
+
+        }
+        if (((i.second[0] == '>') or (i.second[0] == '<') or (i.second[0] == '=') or (i.second[0] == '!'))and (i.second[1] != '=') and (i.second.size() > 1))
+        {
+            if (i.second == string("<--"))
+            {
+                words.push_back(Lexem_Token(i.first, string("<--"), string("Comma")));
+                continue;
+            }
+            if (i.second == string("<-"))
+            {
+                words.push_back(Lexem_Token(i.first, string("<-"), string("Vvod")));
+                continue;
+            }
+            cout << i.second << "  This order operation not exists!" << "Error at string  " << i.first << endl;
+            string sr;
+            for (size_t k = 1; k < i.second.size(); k++) {
+                sr += i.second[k];
+            }
+            cout << "It should delete " << sr << endl;
+            words.push_back(Lexem_Token(i.first, string("Order_Error"), string("Error")));
+            continue;
+
+        }
+
+        if (((i.second[0] == '>') or (i.second[0] == '<') or (i.second[0] == '=') or (i.second[0] == '!')) and (i.second[1] == '=') and (i.second.size() > 2))
+        {
+            if (i.second == string("<--"))
+            {
+                words.push_back(Lexem_Token(i.first, string("<--"), string("Comma")));
+                continue;
+            }
+            if (i.second == string("<-"))
+            {
+                words.push_back(Lexem_Token(i.first, string("<-"), string("Vvod")));
+                continue;
+            }
+            string sr;
+            for (size_t k = 2; k < i.second.size(); k++) {
+                sr += i.second[k];
+            }
+
+            cout << i.second << "  This order operation not exists!" << "Error at string  " << i.first << endl;
+            cout << "It should delete " << sr << endl;
+            words.push_back(Lexem_Token(i.first, string("Order_Error"), string("Error")));
+            continue;
+
+        }
+
+
+        if (i.second == string("-"))
+        {
+            words.push_back(Lexem_Token(i.first, string("-"), string("Ar_Opr")));
+            continue;
+
+        }
+        if (i.second == string("/"))
+        {
+            words.push_back(Lexem_Token(i.first, string("/"), string("Ar_Opr")));
+            continue;
+
+        }
+        if (i.second == string(","))
+        {
+            words.push_back(Lexem_Token(i.first, string(","), string("Sep")));
+            continue;
+
+        }
+        if (i.second == string("="))
+        {
+            words.push_back(Lexem_Token(i.first, string("="), string("Prisv")));
+            continue;
+
+        }
+        if (i.second == string("default"))
+        {
+            words.push_back(Lexem_Token(i.first, string("default"), string("default")));
+            continue;
+
+        }
+        if (i.second == string("each"))
+        {
+            words.push_back(Lexem_Token(i.first, string("each"), string("each")));
+            continue;
+
+        }
+        if (i.second == string("for"))
+        {
+            words.push_back(Lexem_Token(i.first, string("for"), string("for")));
+            continue;
+
+        }
+
+        if (i.second == string("cin"))
+        {
+            words.push_back(Lexem_Token(i.first, string("cin"), string("cin")));
+            continue;
+        }
+        if (i.second == string("throw"))
+        {
+            words.push_back(Lexem_Token(i.first, string("throw"), string("exception")));
+            continue;
+        }
+
+        if (i.second == string("cout"))
+        {
+            words.push_back(Lexem_Token(i.first, string("cout"), string("cout")));
+            continue;
+
+        }
+
+        if (i.second == string("%"))
+        {
+            words.push_back(Lexem_Token(i.first, string("%"), string("Ar_Opr")));
+            continue;
+
+        }
+        if (i.second == string(">"))
+        {
+            words.push_back(Lexem_Token(i.first, string(">"), string("Order")));
+            continue;
+
+        }
+        if (i.second == string("<"))
+        {
+            words.push_back(Lexem_Token(i.first, string("<"), string("Order")));
+            continue;
+
+        }
+        if (i.second == string(">="))
+        {
+            words.push_back(Lexem_Token(i.first, string(">="), string("Order")));
+            continue;
+
+        }
+        if (i.second == string("<="))
+        {
+            words.push_back(Lexem_Token(i.first, string("<="), string("Order")));
+            continue;
+
+        }
+        if (i.second == string("!="))
+        {
+            words.push_back(Lexem_Token(i.first, string("!="), string("Order")));
+            continue;
+
+        }
+        if (i.second == string("=="))
+        {
+            words.push_back(Lexem_Token(i.first, string("=="), string("Order")));
+            continue;
+
+        }
+        if (i.second == string("get"))
+        {
+            words.push_back(Lexem_Token(i.first, string("get"), string("MatrixAR_Op")));
+            continue;
+
+        }
+        if (i.second == string("obr"))
+        {
+            words.push_back(Lexem_Token(i.first, string("obr"), string("MatrixAR_Op")));
+            continue;
+
+        }
+        if (i.second == string("blop"))
+        {
+            words.push_back(Lexem_Token(i.first, string("blop"), string("MatrixAR_Op")));
+            continue;
+
+        }
+        if (i.second == string("nr"))
+        {
+            words.push_back(Lexem_Token(i.first, string("nr"), string("MatrixAR_Op")));
+            continue;
+
+        }
+        if (i.second == string("tr"))
+        {
+            words.push_back(Lexem_Token(i.first, string("tr"), string("MatrixAR_Op")));
+            continue;
+
+        }
+        if (i.second == string("mnr"))
+        {
+            words.push_back(Lexem_Token(i.first, string("mnr"), string("MatrixAR_Op")));
+            continue;
+
+        }
+        if (i.second == string("sloz"))
+        {
+            words.push_back(Lexem_Token(i.first, string("sloz"), string("MatrixAR_Op")));
+            continue;
+
+        }
+        if (i.second == string("mns"))
+        {
+            words.push_back(Lexem_Token(i.first, string("blop"), string("MatrixAR_Op")));
+            continue;
+
+        }
+        if (i.second == string("umn"))
+        {
+            words.push_back(Lexem_Token(i.first, string("blop"), string("MatrixAR_Op")));
+            continue;
+
+        }
+
+        if (i.second == string("*"))
+        {
+            words.push_back(Lexem_Token(i.first, string("*"), string("Ar_Opr")));
+            continue;
+
+        }
+
+        if ((i.second == string(":")) and(i.second.size()==1))
+        {
+            words.push_back(Lexem_Token(i.first, string(":"), string("Twocolon")));
+            continue;
+
+        }
+        if ((i.second == string("jump")))
+        {
+            words.push_back(Lexem_Token(i.first, string("jump"), string("jump")));
+            continue;
+
+        }
+        if (words[words.size() - 1].lexem == string("jump"))
+        {
+            words.push_back(Lexem_Token(i.first,i.second, string("Label")));
+            continue;
+
+        }
+        if ((i.second[i.second.size()-1] == ':') and (i.second.size() >1))
+        {
+            words.push_back(Lexem_Token(i.first,i.second, string("Label")));
+            continue;
+
+        }
+        if ((i.second == string("Matrix")))
+        {
+            words.push_back(Lexem_Token(i.first, string("Matrix"), string("Type")));
+            continue;
+
+        }
+        if (i.second == string("int"))
+        {
+            words.push_back(Lexem_Token(i.first, string("int"), string("Type")));
+            continue;
+
+        }
+        if (i.second == string("<--"))
+        {
+            words.push_back(Lexem_Token(i.first, string("<--"), string("Comma")));
+            continue;
+
+
+        }
+        if (i.second == string("("))
+        {
+            words.push_back(Lexem_Token(i.first, string("("), string("Left_Br")));
+            continue;
+
+        }
+        if (i.second == string(")"))
+        {
+            words.push_back(Lexem_Token(i.first, string(")"), string("Right_Br")));
+            continue;
+
+        }
+        if (i.second == string("{"))
+        {
+            words.push_back(Lexem_Token(i.first, string("("), string("Left_KBr")));
+            continue;
+
+        }
+        if (i.second == string("}"))
+        {
+            words.push_back(Lexem_Token(i.first, string(")"), string("Right_KBr")));
+            continue;
+
+        }
+        if (i.second == string("default:"))
+        {
+            words.push_back(Lexem_Token(i.first, string("default:"), string("switch_default")));
+            continue;
+
+        }
+        if (i.second == string("throw:"))
+        {
+            words.push_back(Lexem_Token(i.first, string("throw:"), string("exception")));
+            continue;
+
+        }
+        if (i.second == string("<-"))
+        {
+            words.push_back(Lexem_Token(i.first, string("<-"), string("Vvod")));
+            continue;
+
+
+        }
+
+        if (i.second == string("->"))
+        {
+            words.push_back(Lexem_Token(i.first, string("->"), string("Vivod")));
+            continue;
+
+
+        }
+
+        if ( (i.second[0] == '[')and(i.second.size()>1) )//проверяем что у нас правильный ввод матрицы
+        {
+            if (Check_Matrix_correct(i.second))
+            {
+                words.push_back(Lexem_Token(i.first,i.second, string("MatrixConstant")));
+                continue;
+
+            }
+            else
+            {
+                words.push_back(Lexem_Token(i.first, string("Error in Matrix!It contains forbidden symbol"), string("Error")));
+                cout << "At  " << i.first << "  str"<<endl;
+                continue;
+
+            }
+
+        }
+        if (isalpha(i.second[0]))
+        {
+            if (Check_Var_correct(i.second)) {
+                words.push_back(Lexem_Token(i.first, i.second, string("Var")));
+                continue;
+            }
+            words.push_back(Lexem_Token(i.first, string("Error in var"), string("Error")));
+            continue;
+
+
+        }
+        else
+        {
+            bool t=0;
+            bool e = 0;
+            string mistake;
+
+
+            for (size_t k = 0; k < i.second.size(); k++)
+            {
+
+                if (isalpha(i.second[k]))
+                {
+                    for (size_t g = 0; g < i.second.size(); g++) {
+                        if(g<k)
+                        {
+                            mistake += i.second[g];
+                            continue;
+                        }
+                        if (isdigit(i.second[g]) or isalpha(i.second[g]))
+                            continue;
+                        mistake += i.second[g];
+
+                    }
+                    break;
+                }
+
+            }
+            if (mistake.size() != 0)
+            {
+                cout << "Should be deleted  " << mistake << "  in var  " << i.second <<" at string  "<<i.first<<endl;
+                words.push_back(Lexem_Token(i.first, string("Error Vars"), string("Error")));
+                continue;
+            }
+
+            for (size_t k = 0; k < i.second.size(); k++)
+            {
+
+                if (isdigit(i.second[k]))
+                {
+                    for (size_t g = 0; g < i.second.size(); g++) {
+                        if (g < k)
+                        {
+                            mistake += i.second[g];
+                            continue;
+                        }
+                        if (isdigit(i.second[g]))
+                        {
+                            continue;
+                        }
+                        mistake += i.second[g];
+
+                    }
+                    break;
+
+                }
+            }
+            //cout << endl << endl << mistake << endl << endl;
+            if (mistake.size() != 0)
+            {
+                cout << "Should be deleted  " << mistake << "  in constant  " << i.second << " at string  " << i.first << endl;
+                words.push_back(Lexem_Token(i.first, string("Error const"), string("Error")));
+                continue;
+            }
+
+
+
+            cout << "Error  lexema it cannot exists in this language " << i.second<<endl<<"In string "<<i.first<<endl;
+            words.push_back(Lexem_Token(i.first, string("Error"), string("Error")));
+            continue;
+        }
+
+    }
+    cout << "Number" << "     " << "Type" <<"     "<< "Lexem"<<endl;
+    for (auto i : words)
+        cout << std::setw( 22 ) << std::left<< i.number_of_string << std::setw( 22 )<< i.name << std::setw( 22 ) << i.lexem<<endl;
+
+
+}
+int main()
+{
+
+    Lexer();
+
+}
